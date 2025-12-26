@@ -12,6 +12,13 @@
     <h1>Films recommandés</h1>
 </header>
 
+<nav class="tabs">
+<a href="/?{{ request.query_string.decode('utf-8') }}" class="{% if active_tab == 'base' %}active{% endif %}">Méthode A</a>
+<a href="/alt?{{ request.query_string.decode('utf-8') }}" class="{% if active_tab == 'alt' %}active{% endif %}">Méthode B</a>
+
+</nav>
+
+
 <form method="get" class="filters">
 
     <!-- Films vus / pas vus -->

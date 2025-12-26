@@ -69,3 +69,23 @@ header {
     border-radius: 5px;
     text-decoration: none;
 }
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tabs a {
+  padding: 8px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  border: 1px solid #ccc;
+}
+
+.tabs a.active {
+  font-weight: 600;
+  border-color: #000;
+}

@@ -1,16 +1,18 @@
-import os
 from flask import Flask, render_template, request
 import pandas as pd
+import os
 
 app = Flask(__name__)
 
-@app.route("/")
-def index():
-    csv_path = os.path.join(os.path.dirname(__file__), "predictions_films.csv")
+BASE_DIR = os.path.dirname(__file__)
+
+def load_df(csv_filename: str) -> pd.DataFrame:
+    csv_path = os.path.join(BASE_DIR, csv_filename)
     df = pd.read_csv(csv_path, encoding="utf-8")
-
     df["rk_sc"] = df.index + 1
+    return df
 
+def apply_filters(df: pd.DataFrame):
     year_min = request.args.get("year_min", default=df["year_rym"].min(), type=float)
     year_max = request.args.get("year_max", default=df["year_rym"].max(), type=float)
     proba_min = request.args.get("proba_min", default=0.0, type=float)
@@ -39,8 +41,7 @@ def index():
     countries = sorted(df["country_sc"].dropna().unique())
     films = df.to_dict(orient="records")
 
-    return render_template(
-        "index.html",
+    ctx = dict(
         films=films,
         year_min=int(year_min),
         year_max=int(year_max),
@@ -50,8 +51,27 @@ def index():
         proba_max=proba_max,
         seen=seen,
         sort=sort,
-        order=order
+        order=order,
     )
+    return ctx
+
+@app.route("/")
+def index():
+    df = load_df("predictions_films.csv")
+    ctx = apply_filters(df)
+    ctx["active_tab"] = "base"
+    return render_template("index.html", **ctx)
+
+@app.route("/alt")
+def alt():
+    # 👉 mets ici ton autre fichier OU une autre logique de calcul
+    df = load_df("predictions_films_alt.csv")  # par ex
+    # si ta proba s'appelle autrement, renomme pour réutiliser le template :
+    # df["proba_must_watch"] = df["proba_autre_modele"]
+
+    ctx = apply_filters(df)
+    ctx["active_tab"] = "alt"
+    return render_template("index.html", **ctx)  # ou "alt.html" si tu veux une page différente
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
