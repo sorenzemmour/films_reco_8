@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Films recommandés</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<header>
+    <h1>Films recommandés</h1>
+</header>
+
+<form method="get" class="filters">
+
+    <!-- Films vus / pas vus -->
+    <label>
+        Films :
+        <select name="seen">
+            <option value="0" {% if seen == "0" %}selected{% endif %}>Non vus</option>
+            <option value="1" {% if seen == "1" %}selected{% endif %}>Vus</option>
+        </select>
+    </label>
+
+    <!-- Année -->
+    <label>
+        Année min :
+        <input type="number" name="year_min" value="{{ year_min }}">
+    </label>
+    <label>
+        Année max :
+        <input type="number" name="year_max" value="{{ year_max }}">
+    </label>
+
+    <!-- Pays -->
+    <label>
+        Pays :
+        <select name="country" multiple size="5">
+            {% for c in countries %}
+            <option value="{{ c }}" {% if c in country %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+
+    <!-- Probabilité -->
+    <label>
+        Proba min :
+        <input type="number" step="0.01" name="proba_min" value="{{ proba_min }}">
+    </label>
+    <label>
+        Proba max :
+        <input type="number" step="0.01" name="proba_max" value="{{ proba_max }}">
+    </label>
+
+    <!-- Tri -->
+    <label>
+        Tri :
+        <select name="sort">
+            <option value="rk_sc" {% if sort == "rk_sc" %}selected{% endif %}>Index origine</option>
+            <option value="proba_must_watch" {% if sort == "proba_must_watch" %}selected{% endif %}>Probabilité</option>
+            <option value="rk_rym" {% if sort == "rk_rym" %}selected{% endif %}>rk_rym</option>
+        </select>
+    </label>
+
+    <label>
+        Ordre :
+        <select name="order">
+            <option value="asc" {% if order == "asc" %}selected{% endif %}>Ascendant</option>
+            <option value="desc" {% if order == "desc" %}selected{% endif %}>Descendant</option>
+        </select>
+    </label>
+
+    <button type="submit">Filtrer</button>
+    <a href="/" class="reset-btn">Réinitialiser</a>
+
+</form>
+
+<div class="grid">
+    {% for film in films %}
+    <div class="card">
+        <img src="{{ film.picture }}" alt="{{ film.title_sc }}">
+
+        <div class="info">
+            <h3>{{ film.title_sc }}</h3>
+
+            {# ==== CALCUL couleur rouge -> vert (0.25 → 0.60) ==== #}
+            {% set p = film.proba_must_watch or 0 %}
+            {% set scaled = (p - 0.25) / 0.35 %}  {# 0.60 - 0.25 #}
+
+            {% if scaled < 0 %}
+                {% set scaled = 0 %}
+            {% endif %}
+            {% if scaled > 1 %}
+                {% set scaled = 1 %}
+            {% endif %}
+
+            {% set hue = 120 * scaled %}
+
+            <span class="proba" style="background-color: hsl({{ hue }}, 90%, 40%);">
+                {{ (p * 100) | round(1) }}%
+            </span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+</body>
+</html>

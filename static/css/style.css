@@ -1,0 +1,71 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #121212;
+    color: white;
+}
+
+header {
+    padding: 20px;
+    text-align: center;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 160px);
+    gap: 20px;
+    justify-content: center;
+    padding: 20px;
+}
+
+.card {
+    position: relative;
+    width: 160px;
+    text-decoration: none;
+}
+
+.card img {
+    width: 100%;
+    border-radius: 8px;
+}
+
+.card .info {
+    margin-top: 5px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.card h3 {
+    font-size: 0.9rem;
+    color: white;
+}
+
+.proba {
+    background: #4caf50;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: white;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 15px;
+    justify-content: center;
+    background:#1E1E1E;
+}
+
+.filters label {
+    color: white;
+    font-size: .9rem;
+}
+
+.reset-btn {
+    background: #444;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 5px;
+    text-decoration: none;
+}
