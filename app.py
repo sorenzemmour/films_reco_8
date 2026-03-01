@@ -1,21 +1,23 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import os
+import json
+import joblib
+import shap
 
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(__file__)
 
-import joblib
-import shap
-import json
-
+# =============================
+# 1) CHARGER MODÈLE + METADATA (AU DÉMARRAGE)
+# =============================
 MODEL_PATH = os.path.join(BASE_DIR, "best_model.pkl")
 METADATA_PATH = os.path.join(BASE_DIR, "model_metadata.json")
 
 best_model = joblib.load(MODEL_PATH)
 
-with open(METADATA_PATH) as f:
+with open(METADATA_PATH, "r", encoding="utf-8") as f:
     metadata = json.load(f)
 
 features_to_use = metadata["features_to_use"]
@@ -26,6 +28,20 @@ explainer = shap.TreeExplainer(best_model)
 
 # Cache simple mémoire
 explain_cache = {}
+
+# =============================
+# 2) CHARGER DONNÉES (AU DÉMARRAGE)
+# =============================
+PRED_PATH = os.path.join(BASE_DIR, "predictions_films.csv")
+FEAT_PATH = os.path.join(BASE_DIR, "features_films.parquet")
+
+df_pred = pd.read_csv(PRED_PATH, encoding="utf-8")
+df_feat = pd.read_parquet(FEAT_PATH)
+
+# Indexation pour lookup rapide
+df_pred = df_pred.set_index("original_index", drop=False)
+df_feat = df_feat.set_index("original_index", drop=False)
+
 
 def load_df(csv_filename: str) -> pd.DataFrame:
     csv_path = os.path.join(BASE_DIR, csv_filename)
@@ -100,57 +116,64 @@ if __name__ == "__main__":
 
 @app.route("/explain/<int:film_id>")
 def explain_film(film_id):
+    try:
 
-    if film_id in explain_cache:
-        return explain_cache[film_id]
+        if film_id not in df_feat.index:
+            return {"error": "Film not found"}, 404
 
-    df = load_df("predictions_films.csv")
-    row = df[df["original_index"] == film_id]
+        # 🔹 1. Récupération des lignes
+        row_pred = df_pred.loc[[film_id]]
+        row_feat = df_feat.loc[[film_id]]
 
-    if len(row) == 0:
-        return {"error": "Film not found"}, 404
+        # 🔹 2. Reconstruction des features modèle
+        X_row = row_feat[features_to_use].copy()
 
-    X_row = row[features_to_use].copy()
+        # 🔹 3. Recast des catégories
+        for col in categorical_cols:
+            X_row[col] = pd.Categorical(
+                X_row[col],
+                categories=categories_map[col]
+            )
 
-    for col in categorical_cols:
-        X_row[col] = pd.Categorical(
-            X_row[col],
-            categories=categories_map[col]
-        )
+        # 🔹 4. Calcul SHAP
+        shap_values = explainer(X_row)
 
-    shap_values = explainer(X_row)
+        predicted_class = int(row_pred["prediction_classe"].values[0])
 
-    predicted_class = int(row["prediction_classe"].values[0])
+        if len(shap_values.values.shape) == 3:
+            values = shap_values[0, :, predicted_class].values
+            base_value = explainer.expected_value[predicted_class]
+        else:
+            values = shap_values[0].values
+            base_value = explainer.expected_value
 
-    if len(shap_values.values.shape) == 3:
-        values = shap_values[0, :, predicted_class].values
-        base_value = explainer.expected_value[predicted_class]
-    else:
-        values = shap_values[0].values
-        base_value = explainer.expected_value
+        contributions = []
 
-    contributions = []
+        for feature, val, shap_val in zip(features_to_use, X_row.iloc[0], values):
+            contributions.append({
+                "feature": feature,
+                "value": str(val),
+                "shap": float(shap_val)
+            })
 
-    for feature, val, shap_val in zip(features_to_use, X_row.iloc[0], values):
-        contributions.append({
-            "feature": feature,
-            "value": str(val),
-            "shap": float(shap_val)
-        })
+        contributions = sorted(
+            contributions,
+            key=lambda x: abs(x["shap"]),
+            reverse=True
+        )[:10]
 
-    # Top 10 contributions
-    contributions = sorted(
-        contributions,
-        key=lambda x: abs(x["shap"]),
-        reverse=True
-    )[:10]
+        result = {
+            "base_value": float(base_value),
+            "prediction_proba": float(row_pred["proba_must_watch"].values[0]),
+            "prediction_label": row_pred["prediction_label"].values[0],
+            "contributions": contributions
+        }
 
-    result = {
-        "base_value": float(base_value),
-        "prediction_proba": float(row["proba_must_watch"].values[0]),
-        "prediction_label": row["prediction_label"].values[0],
-        "contributions": contributions
-    }
+        return result
 
-    explain_cache[film_id] = result
-    return result
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "trace": traceback.format_exc()
+        }, 500
