@@ -101,41 +101,25 @@ def index():
 
 @app.route("/alt")
 def alt():
-    # 👉 mets ici ton autre fichier OU une autre logique de calcul
-    df = load_df("predictions_films_alt.csv")  # par ex
-    # si ta proba s'appelle autrement, renomme pour réutiliser le template :
-    # df["proba_must_watch"] = df["proba_autre_modele"]
-
+    df = load_df("predictions_films_alt.csv")
     ctx = apply_filters(df)
     ctx["active_tab"] = "alt"
-    return render_template("index.html", **ctx)  # ou "alt.html" si tu veux une page différente
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    return render_template("index.html", **ctx)
 
 @app.route("/explain/<int:film_id>")
 def explain_film(film_id):
     try:
-
         if film_id not in df_feat.index:
-            return {"error": "Film not found"}, 404
+            return jsonify({"error": "Film not found", "film_id": film_id}), 404
 
-        # 🔹 1. Récupération des lignes
         row_pred = df_pred.loc[[film_id]]
         row_feat = df_feat.loc[[film_id]]
 
-        # 🔹 2. Reconstruction des features modèle
         X_row = row_feat[features_to_use].copy()
 
-        # 🔹 3. Recast des catégories
         for col in categorical_cols:
-            X_row[col] = pd.Categorical(
-                X_row[col],
-                categories=categories_map[col]
-            )
+            X_row[col] = pd.Categorical(X_row[col], categories=categories_map[col])
 
-        # 🔹 4. Calcul SHAP
         shap_values = explainer(X_row)
 
         predicted_class = int(row_pred["prediction_classe"].values[0])
@@ -148,19 +132,10 @@ def explain_film(film_id):
             base_value = explainer.expected_value
 
         contributions = []
-
         for feature, val, shap_val in zip(features_to_use, X_row.iloc[0], values):
-            contributions.append({
-                "feature": feature,
-                "value": str(val),
-                "shap": float(shap_val)
-            })
+            contributions.append({"feature": feature, "value": str(val), "shap": float(shap_val)})
 
-        contributions = sorted(
-            contributions,
-            key=lambda x: abs(x["shap"]),
-            reverse=True
-        )[:10]
+        contributions = sorted(contributions, key=lambda x: abs(x["shap"]), reverse=True)[:10]
 
         result = {
             "base_value": float(base_value),
@@ -168,12 +143,13 @@ def explain_film(film_id):
             "prediction_label": row_pred["prediction_label"].values[0],
             "contributions": contributions
         }
-
-        return result
+        return jsonify(result)
 
     except Exception as e:
         import traceback
-        return {
-            "error": str(e),
-            "trace": traceback.format_exc()
-        }, 500
+        return jsonify({"error": str(e), "trace": traceback.format_exc().splitlines()[-30:]}), 500
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
