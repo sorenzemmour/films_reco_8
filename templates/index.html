@@ -15,7 +15,6 @@
 <nav class="tabs">
 <a href="/?{{ request.query_string.decode('utf-8') }}" class="{% if active_tab == 'base' %}active{% endif %}">Méthode A</a>
 <a href="/alt?{{ request.query_string.decode('utf-8') }}" class="{% if active_tab == 'alt' %}active{% endif %}">Méthode B</a>
-
 </nav>
 
 
@@ -86,32 +85,35 @@
 
 <div class="grid">
     {% for film in films %}
-    <div class="card">
+    <div class="card" data-id="{{ film.original_index }}">
+        
         <img src="{{ film.picture }}" alt="{{ film.title_sc }}">
 
         <div class="info">
             <h3>{{ film.title_sc }}</h3>
 
-            {# ==== CALCUL couleur rouge -> vert (0.25 → 0.60) ==== #}
             {% set p = film.proba_must_watch or 0 %}
-            {% set scaled = (p - 0.25) / 0.35 %}  {# 0.60 - 0.25 #}
-
-            {% if scaled < 0 %}
-                {% set scaled = 0 %}
-            {% endif %}
-            {% if scaled > 1 %}
-                {% set scaled = 1 %}
-            {% endif %}
-
+            {% set scaled = (p - 0.25) / 0.35 %}
+            {% if scaled < 0 %}{% set scaled = 0 %}{% endif %}
+            {% if scaled > 1 %}{% set scaled = 1 %}{% endif %}
             {% set hue = 120 * scaled %}
 
             <span class="proba" style="background-color: hsl({{ hue }}, 90%, 40%);">
                 {{ (p * 100) | round(1) }}%
             </span>
         </div>
+
     </div>
     {% endfor %}
 </div>
+
+
+<div id="sidepanel" class="sidepanel hidden">
+    <div id="explain-content"></div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="/static/js/explain.js"></script>
 
 </body>
 </html>

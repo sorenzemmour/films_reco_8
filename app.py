@@ -6,6 +6,27 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(__file__)
 
+import joblib
+import shap
+import json
+
+MODEL_PATH = os.path.join(BASE_DIR, "best_model.pkl")
+METADATA_PATH = os.path.join(BASE_DIR, "model_metadata.json")
+
+best_model = joblib.load(MODEL_PATH)
+
+with open(METADATA_PATH) as f:
+    metadata = json.load(f)
+
+features_to_use = metadata["features_to_use"]
+categorical_cols = metadata["categorical_cols"]
+categories_map = metadata["categories"]
+
+explainer = shap.TreeExplainer(best_model)
+
+# Cache simple mémoire
+explain_cache = {}
+
 def load_df(csv_filename: str) -> pd.DataFrame:
     csv_path = os.path.join(BASE_DIR, csv_filename)
     df = pd.read_csv(csv_path, encoding="utf-8")
@@ -76,3 +97,60 @@ def alt():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
+@app.route("/explain/<int:film_id>")
+def explain_film(film_id):
+
+    if film_id in explain_cache:
+        return explain_cache[film_id]
+
+    df = load_df("predictions_films.csv")
+    row = df[df["original_index"] == film_id]
+
+    if len(row) == 0:
+        return {"error": "Film not found"}, 404
+
+    X_row = row[features_to_use].copy()
+
+    for col in categorical_cols:
+        X_row[col] = pd.Categorical(
+            X_row[col],
+            categories=categories_map[col]
+        )
+
+    shap_values = explainer(X_row)
+
+    predicted_class = int(row["prediction_classe"].values[0])
+
+    if len(shap_values.values.shape) == 3:
+        values = shap_values[0, :, predicted_class].values
+        base_value = explainer.expected_value[predicted_class]
+    else:
+        values = shap_values[0].values
+        base_value = explainer.expected_value
+
+    contributions = []
+
+    for feature, val, shap_val in zip(features_to_use, X_row.iloc[0], values):
+        contributions.append({
+            "feature": feature,
+            "value": str(val),
+            "shap": float(shap_val)
+        })
+
+    # Top 10 contributions
+    contributions = sorted(
+        contributions,
+        key=lambda x: abs(x["shap"]),
+        reverse=True
+    )[:10]
+
+    result = {
+        "base_value": float(base_value),
+        "prediction_proba": float(row["proba_must_watch"].values[0]),
+        "prediction_label": row["prediction_label"].values[0],
+        "contributions": contributions
+    }
+
+    explain_cache[film_id] = result
+    return result

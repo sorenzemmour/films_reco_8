@@ -22,6 +22,7 @@ header {
     position: relative;
     width: 160px;
     text-decoration: none;
+    cursor: pointer;
 }
 
 .card img {
@@ -89,3 +90,20 @@ header {
   font-weight: 600;
   border-color: #000;
 }
+
+.sidepanel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 500px;
+    height: 100%;
+    background: #1E1E1E;
+    padding: 20px;
+    overflow-y: auto;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+}
+
+.hidden {
+    display: none;
+}
+
